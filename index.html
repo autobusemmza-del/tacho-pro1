@@ -8,45 +8,38 @@
 <meta name="theme-color" content="#111111">
 
 <style>
-body {
-  background: #111;
-  color: white;
-  font-family: Arial;
-  text-align: center;
-}
-
-h1 { margin-top: 20px; }
-
-.big { font-size: 50px; margin: 15px; }
-.medium { font-size: 22px; margin: 8px; }
+body { background:#111; color:white; font-family:Arial; text-align:center; }
+h1 { margin-top:20px; }
+.big { font-size:50px; margin:15px; }
+.medium { font-size:22px; margin:8px; }
 
 button {
-  padding: 15px 25px;
-  margin: 10px;
-  font-size: 18px;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
+  padding:15px 25px;
+  margin:10px;
+  font-size:18px;
+  border:none;
+  border-radius:8px;
+  cursor:pointer;
 }
 
-.drive { background: green; }
-.break { background: blue; }
-.work { background: orange; }
-.rest { background: red; }
+.drive { background:green; }
+.break { background:blue; }
+.work { background:orange; }
+.rest { background:red; }
 
 .reset {
-  background: black;
-  border: 2px solid white;
-  color: white;
+  background:black;
+  border:2px solid white;
+  color:white;
 }
 
-#summary { margin-top: 20px; font-size: 18px; }
+#summary { margin-top:20px; font-size:18px; }
 
 .daily-work {
-  margin-top: 10px;
-  font-weight: bold;
-  font-size: 22px;
-  color: #00ffcc;
+  margin-top:10px;
+  font-weight:bold;
+  font-size:22px;
+  color:#00ffcc;
 }
 </style>
 </head>
@@ -54,9 +47,9 @@ button {
 <body>
 
 <h1>TACHO PRO</h1>
-<div style="color:red; font-weight:bold;">PRACA DZIENNA</div>
+<div style="color:red;font-weight:bold;">PRACA DZIENNA</div>
 
-<div id="current" class="medium">Odpoczynek</div>
+<div id="current" class="medium"></div>
 
 <div class="big" id="sessionTimer">00:00:00</div>
 
@@ -77,127 +70,112 @@ PRACA DZIENNA: <span id="dailyWork">0 min</span>
 <button class="break" onclick="start('Przerwa')">Przerwa</button>
 <button class="work" onclick="start('Inna praca')">Inna praca</button>
 <button class="rest" onclick="start('Odpoczynek')">Odpoczynek</button>
-
 <br>
 <button class="reset" onclick="resetAll()">RESET</button>
 
 <script>
-let currentActivity = localStorage.getItem("tachoActivity") || "Odpoczynek";
 
-let sessionSeconds = parseInt(localStorage.getItem("sessionSeconds")) || 0;
-let driveSeconds = parseInt(localStorage.getItem("driveSeconds")) || 0;
-let breakSeconds = parseInt(localStorage.getItem("breakSeconds")) || 0;
-
-let lastTick = parseInt(localStorage.getItem("tachoLastTick")) || Date.now();
-
-let totals = JSON.parse(localStorage.getItem("tachoTotals")) || {
-  "Jazda": 0,
-  "Przerwa": 0,
-  "Inna praca": 0,
-  "Odpoczynek": 0
+// === ODCZYT Z PAMIĘCI ===
+let state = JSON.parse(localStorage.getItem("tachoState")) || {
+  currentActivity: "Odpoczynek",
+  activityStart: null,
+  totals: {
+    "Jazda": 0,
+    "Przerwa": 0,
+    "Inna praca": 0,
+    "Odpoczynek": 0
+  },
+  driveContinuous: 0,
+  breakContinuous: 0
 };
 
-document.getElementById("current").innerText = currentActivity;
+function saveState() {
+  localStorage.setItem("tachoState", JSON.stringify(state));
+}
 
 function start(activity) {
-  saveProgress();
-  currentActivity = activity;
-  lastTick = Date.now();
-  localStorage.setItem("tachoActivity", currentActivity);
-  localStorage.setItem("tachoLastTick", lastTick);
-  document.getElementById("current").innerText = activity;
+
+  updateTotals(); // najpierw zapisujemy poprzedni czas
+
+  state.currentActivity = activity;
+  state.activityStart = Date.now();
+
+  saveState();
+  render();
 }
 
-function saveProgress() {
-  let now = Date.now();
-  let diff = Math.floor((now - lastTick) / 1000);
+function updateTotals() {
 
-  sessionSeconds += diff;
-  totals[currentActivity] += diff;
+  if(!state.activityStart) return;
 
-  if(currentActivity === "Jazda") driveSeconds += diff;
-  if(currentActivity === "Przerwa") breakSeconds += diff;
+  let diff = Math.floor((Date.now() - state.activityStart)/1000);
 
-  saveData();
-}
+  state.totals[state.currentActivity] += diff;
 
-function formatTime(sec) {
-  let h = String(Math.floor(sec / 3600)).padStart(2,'0');
-  let m = String(Math.floor((sec % 3600)/60)).padStart(2,'0');
-  let s = String(sec % 60).padStart(2,'0');
-  return h + ":" + m + ":" + s;
-}
-
-function updateTimers() {
-  let now = Date.now();
-  let diff = Math.floor((now - lastTick) / 1000);
-
-  let tempSession = sessionSeconds;
-  let tempDrive = driveSeconds;
-  let tempBreak = breakSeconds;
-
-  if(currentActivity === "Jazda") {
-      tempSession += diff;
-      tempDrive += diff;
+  if(state.currentActivity === "Jazda") {
+    state.driveContinuous += diff;
   }
 
-  if(currentActivity === "Przerwa") {
-      tempSession += diff;
-      tempBreak += diff;
+  if(state.currentActivity === "Przerwa") {
+    state.breakContinuous += diff;
   }
 
-  if(currentActivity === "Inna praca" || currentActivity === "Odpoczynek") {
-      tempSession += diff;
-  }
-
-  document.getElementById("sessionTimer").innerText = formatTime(tempSession);
-  document.getElementById("driveContinuous").innerText = formatTime(tempDrive);
-  document.getElementById("breakContinuous").innerText = formatTime(tempBreak);
-
-  updateSummary(tempDrive, tempBreak);
+  state.activityStart = Date.now();
 }
 
-function updateSummary(tempDrive, tempBreak) {
+function format(sec){
+  let h = String(Math.floor(sec/3600)).padStart(2,'0');
+  let m = String(Math.floor((sec%3600)/60)).padStart(2,'0');
+  let s = String(sec%60).padStart(2,'0');
+  return h+":"+m+":"+s;
+}
 
-  let text = "";
-  let dailyWorkSeconds = 0;
+function render(){
 
-  for (let key in totals) {
-    let value = totals[key];
-    if(key === currentActivity) {
-        value += Math.floor((Date.now() - lastTick) / 1000);
+  let session = 0;
+  if(state.activityStart){
+    session = Math.floor((Date.now()-state.activityStart)/1000);
+  }
+
+  document.getElementById("current").innerText = state.currentActivity;
+  document.getElementById("sessionTimer").innerText = format(session);
+  document.getElementById("driveContinuous").innerText = format(state.driveContinuous);
+  document.getElementById("breakContinuous").innerText = format(state.breakContinuous);
+
+  let text="";
+  let daily=0;
+
+  for(let key in state.totals){
+    let value = state.totals[key];
+    if(key===state.currentActivity){
+      value += session;
     }
+    text += key + ": " + Math.floor(value/60) + " min<br>";
 
-    let mins = Math.floor(value / 60);
-    text += key + ": " + mins + " min<br>";
-
-    if(key === "Jazda" || key === "Inna praca") {
-        dailyWorkSeconds += value;
+    if(key==="Jazda"||key==="Inna praca"){
+      daily += value;
     }
   }
 
-  document.getElementById("summary").innerHTML = text;
-
-  let dailyMins = Math.floor(dailyWorkSeconds / 60);
-  document.getElementById("dailyWork").innerText = dailyMins + " min";
+  document.getElementById("summary").innerHTML=text;
+  document.getElementById("dailyWork").innerText=Math.floor(daily/60)+" min";
 }
 
-function saveData() {
-  localStorage.setItem("sessionSeconds", sessionSeconds);
-  localStorage.setItem("driveSeconds", driveSeconds);
-  localStorage.setItem("breakSeconds", breakSeconds);
-  localStorage.setItem("tachoTotals", JSON.stringify(totals));
-  localStorage.setItem("tachoLastTick", lastTick);
-}
-
-function resetAll() {
-  if(confirm("Zresetować wszystkie liczniki?")) {
-      localStorage.clear();
-      location.reload();
+function resetAll(){
+  if(confirm("Zresetować wszystko?")){
+    localStorage.removeItem("tachoState");
+    location.reload();
   }
 }
 
-setInterval(updateTimers, 1000);
+setInterval(()=>{
+  updateTotals();
+  saveState();
+  render();
+},1000);
+
+render();
+
 </script>
 
 <script>
