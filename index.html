@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+
+<html lang="pl">
+
+<head>
+
+  <link rel="manifest" href="manifest.json">
+
+<meta name="theme-color" content="#111111">
+
+<meta charset="UTF-8">
+
+<title>Tacho PRO</title>
+
+
+
+<style>
+
+body {
+
+  background: #111;
+
+  color: white;
+
+  font-family: Arial;
+
+  text-align: center;
+
+}
+
+
+
+h1 { margin-top: 20px; }
+
+
+
+.big { font-size: 50px; margin: 15px; }
+
+.medium { font-size: 22px; margin: 8px; }
+
+
+
+button {
+
+  padding: 15px 25px;
+
+  margin: 10px;
+
+  font-size: 18px;
+
+  border: none;
+
+  border-radius: 8px;
+
+  cursor: pointer;
+
+}
+
+
+
+.drive { background: green; }
+
+.break { background: blue; }
+
+.work { background: orange; }
+
+.rest { background: red; }
+
+
+
+.reset {
+
+  background: black;
+
+  border: 2px solid white;
+
+  color: white;
+
+}
+
+
+
+#summary { margin-top: 20px; font-size: 18px; }
+
+
+
+.daily-work {
+
+  margin-top: 10px;
+
+  font-weight: bold;
+
+  font-size: 22px;
+
+  color: #00ffcc;
+
+}
+
+</style>
+
+</head>
+
+<script>
+
+if ("serviceWorker" in navigator) {
+
+  index.html.serviceWorker.register("service-worker.js");
+
+}
+
+</script>
+
+<body>
+
+
+
+<h1>TACHO PRO</h1>
+
+<div style="color:red; font-weight:bold;">PRACA DZIENNA</div>
+
+
+
+<div id="current" class="medium">Odpoczynek</div>
+
+
+
+<div class="big" id="sessionTimer">00:00:00</div>
+
+
+
+<div class="medium">Ciągła jazda:</div>
+
+<div class="medium" id="driveContinuous">00:00:00</div>
+
+
+
+<div class="medium">Ciągła przerwa:</div>
+
+<div class="medium" id="breakContinuous">00:00:00</div>
+
+
+
+<h3>Podsumowanie dnia:</h3>
+
+<div id="summary"></div>
+
+
+
+<div class="daily-work">
+
+PRACA DZIENNA: <span id="dailyWork">0 min</span>
+
+</div>
+
+
+
+<button class="drive" onclick="start('Jazda')">Jazda</button>
+
+<button class="break" onclick="start('Przerwa')">Przerwa</button>
+
+<button class="work" onclick="start('Inna praca')">Inna praca</button>
+
+<button class="rest" onclick="start('Odpoczynek')">Odpoczynek</button>
+
+
+
+<br>
+
+<button class="reset" onclick="resetAll()">RESET</button>
+
+
+
+<script>
+
+let currentActivity = "Odpoczynek";
+
+
+
+let sessionSeconds = 0;
+
+let driveSeconds = 0;
+
+let breakSeconds = 0;
+
+
+
+let lastTick = Date.now();
+
+
+
+let totals = {
+
+  "Jazda": 0,
+
+  "Przerwa": 0,
+
+  "Inna praca": 0,
+
+  "Odpoczynek": 0
+
+};
+
+
+
+function start(activity) {
+
+  currentActivity = activity;
+
+  lastTick = Date.now();
+
+  document.getElementById("current").innerText = activity;
+
+}
+
+
+
+function formatTime(sec) {
+
+  let h = String(Math.floor(sec / 3600)).padStart(2,'0');
+
+  let m = String(Math.floor((sec % 3600)/60)).padStart(2,'0');
+
+  let s = String(sec % 60).padStart(2,'0');
+
+  return h + ":" + m + ":" + s;
+
+}
+
+
+
+function updateTimers() {
+
+
+
+  let now = Date.now();
+
+  let diff = Math.floor((now - lastTick) / 1000);
+
+  lastTick = now;
+
+
+
+  sessionSeconds += diff;
+
+  totals[currentActivity] += diff;
+
+
+
+  if(currentActivity === "Jazda") {
+
+      driveSeconds += diff;
+
+  }
+
+
+
+  if(currentActivity === "Przerwa") {
+
+      breakSeconds += diff;
+
+  }
+
+
+
+  document.getElementById("sessionTimer").innerText = formatTime(sessionSeconds);
+
+  document.getElementById("driveContinuous").innerText = formatTime(driveSeconds);
+
+  document.getElementById("breakContinuous").innerText = formatTime(breakSeconds);
+
+
+
+  updateSummary();
+
+}
+
+
+
+function updateSummary() {
+
+
+
+  let text = "";
+
+  let dailyWorkSeconds = 0;
+
+
+
+  for (let key in totals) {
+
+    let mins = Math.floor(totals[key] / 60);
+
+    text += key + ": " + mins + " min<br>";
+
+
+
+    if(key === "Jazda" || key === "Inna praca") {
+
+        dailyWorkSeconds += totals[key];
+
+    }
+
+  }
+
+
+
+  document.getElementById("summary").innerHTML = text;
+
+
+
+  let dailyMins = Math.floor(dailyWorkSeconds / 60);
+
+  document.getElementById("dailyWork").innerText = dailyMins + " min";
+
+}
+
+
+
+function resetAll() {
+
+
+
+  if(confirm("Zresetować wszystkie liczniki?")) {
+
+
+
+      sessionSeconds = 0;
+
+      driveSeconds = 0;
+
+      breakSeconds = 0;
+
+
+
+      totals = {
+
+        "Jazda": 0,
+
+        "Przerwa": 0,
+
+        "Inna praca": 0,
+
+        "Odpoczynek": 0
+
+      };
+
+
+
+      currentActivity = "Odpoczynek";
+
+      document.getElementById("current").innerText = "Odpoczynek";
+
+
+
+      updateSummary();
+
+  }
+
+}
+
+
+
+setInterval(updateTimers, 1000);
+
+updateSummary();
+
+</script>
+
+
+
+</body>
+
+</html>
+
